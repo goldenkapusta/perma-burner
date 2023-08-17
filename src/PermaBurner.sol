@@ -63,7 +63,10 @@ contract PermaBurner {
         Claim memory cachedClaimDets = claimDetails[msg.sender];
 
         if (block.timestamp < cachedClaimDets.claimableTs)
-            revert TooEarlyGoldenBoy(block.timestamp, cachedClaimDets.claimableTs);
+            revert TooEarlyGoldenBoy(
+                block.timestamp,
+                cachedClaimDets.claimableTs
+            );
 
         claimDetails[msg.sender] = Claim({
             claimableGoldAmount: 0,
