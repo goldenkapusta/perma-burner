@@ -8,5 +8,9 @@ interface IBpt {
 
     function getPoolId() external view returns (bytes32);
 
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 }
