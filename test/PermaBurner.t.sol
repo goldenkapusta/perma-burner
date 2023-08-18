@@ -4,25 +4,14 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "../src/PermaBurner.sol";
 import "./Fixture.t.sol";
-import "./utils.sol";
 
 contract TestPermaBurner is Fixture {
     PermaBurner public permaBurner;
 
-    Utils internal utils;
-
-    address payable[] internal users;
-    address internal alice;
-    address internal bob;
-
     IBpt public constant BPT = IBpt(0xE40cBcCba664C7B1a953827C062F5070B78de868);
 
-    function setUp() public {
-        utils = new Utils();
-        users = utils.createUsers(2);
-        alice = users[0];
-        bob = users[1];
-
+    function setUp() public override {
+        super.setUp();
         permaBurner = new PermaBurner();
         // Alice and Bob approve PermaBurner to spend their tokens
         vm.prank(alice);
