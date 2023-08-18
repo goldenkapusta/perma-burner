@@ -8,8 +8,6 @@ import "./Fixture.t.sol";
 contract TestPermaBurner is Fixture {
     PermaBurner public permaBurner;
 
-    IBpt public constant BPT = IBpt(0xE40cBcCba664C7B1a953827C062F5070B78de868);
-
     function setUp() public override {
         super.setUp();
         permaBurner = new PermaBurner();

@@ -16,8 +16,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol"
  * be immediately releasable.
  */
 contract InflationController is Ownable {
-    event EtherReleased(uint256 amount);
-    event ERC20Released(address indexed token, uint256 amount);
+    uint256 public constant SWEEP_TIMELOCK_DURATION = 14 days;
 
     uint256 private _released;
     mapping(address => uint256) private _erc20Released;
@@ -25,11 +24,15 @@ contract InflationController is Ownable {
     uint64 private immutable _duration;
 
     address private _beneficiary;
+    uint256 public timelockEnd;
 
     event BeneficiaryChanged(
         address indexed previousBeneficiary,
         address indexed newBeneficiary
     );
+    event EtherReleased(uint256 amount);
+    event ERC20Released(address indexed token, uint256 amount);
+    event TimelockSet(uint256 timelockEnd);
 
     /**
      * @dev Set start timestamp and vesting duration of the inflation controller.
@@ -165,6 +168,30 @@ contract InflationController is Ownable {
             return totalAllocation;
         } else {
             return (totalAllocation * (timestamp - start())) / duration();
+        }
+    }
+
+    /// @notice If Timelock is over, sweep all ERC20 tokens to the owner, otherwise create a new timelock
+    /// @param tokens Array of ERC20 token addresses
+    function sweepTimelock(
+        address[] memory tokens,
+        address receiver
+    ) external onlyOwner {
+        if (timelockEnd == 0) {
+            timelockEnd = block.timestamp + SWEEP_TIMELOCK_DURATION;
+            emit TimelockSet(timelockEnd);
+        } else if (block.timestamp >= timelockEnd) {
+            for (uint256 i = 0; i < tokens.length; i++) {
+                SafeERC20.safeTransfer(
+                    IERC20(tokens[i]),
+                    receiver,
+                    IERC20(tokens[i]).balanceOf(address(this))
+                );
+            }
+            timelockEnd = 0;
+            emit TimelockSet(timelockEnd);
+        } else {
+            revert("InflationController: timelock not over");
         }
     }
 }
