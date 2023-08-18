@@ -52,20 +52,9 @@ contract TestInflationController is Fixture {
             address(GOLD),
             arbitraryAmount
         );
-
-        setStorage(
-            address(inflationController),
-            BPT.balanceOf.selector,
-            address(BPT),
-            arbitraryAmount
-        );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(GOLD);
-        tokens[1] = address(BPT);
         // Now alice wants to sweep the ERC20 tokens
         vm.prank(alice);
-        inflationController.sweepTimelock(tokens, alice);
+        inflationController.sweepTimelock(address(GOLD), alice);
 
         // Make sure timelock is set to 14 days from now
         assertEq(
@@ -80,11 +69,10 @@ contract TestInflationController is Fixture {
 
         // Now alice wants to sweep the ERC20 tokens
         vm.prank(alice);
-        inflationController.sweepTimelock(tokens, alice);
+        inflationController.sweepTimelock(address(GOLD), alice);
 
         // Make sure alice now has the ERC20 tokens
         assertEq(GOLD.balanceOf(alice), arbitraryAmount);
-        assertEq(BPT.balanceOf(alice), arbitraryAmount);
         // Make sure timelock is set to 0
         assertEq(inflationController.timelockEnd(), 0);
     }
@@ -105,19 +93,9 @@ contract TestInflationController is Fixture {
             arbitraryAmount
         );
 
-        setStorage(
-            address(inflationController),
-            BPT.balanceOf.selector,
-            address(BPT),
-            arbitraryAmount
-        );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(GOLD);
-        tokens[1] = address(BPT);
         // Now alice wants to sweep the ERC20 tokens
         vm.prank(alice);
-        inflationController.sweepTimelock(tokens, alice);
+        inflationController.sweepTimelock(address(GOLD), alice);
 
         // Make sure timelock is set to 14 days from now
         assertEq(
@@ -135,12 +113,65 @@ contract TestInflationController is Fixture {
         // Now alice wants to sweep the ERC20 tokens
         vm.prank(alice);
         vm.expectRevert("InflationController: timelock not over");
-        inflationController.sweepTimelock(tokens, alice);
+        inflationController.sweepTimelock(address(GOLD), alice);
 
         // Make sure alice has no ERC20 tokens
         assertEq(GOLD.balanceOf(alice), 0);
-        assertEq(BPT.balanceOf(alice), 0);
         // Make sure timelock is not 0
         assertNotEq(inflationController.timelockEnd(), 0);
+    }
+
+    /// @dev Test when owner tries to sweep non-protected tokens
+    function testSweepTimelockNotProtectedToken() public {
+        // Make alice owner of the contract
+        inflationController.transferOwnership(alice);
+        // Now alice wants to sweep the ERC20 tokens
+        vm.startPrank(alice);
+        vm.expectRevert("InflationController: not protected token");
+        inflationController.sweepTimelock(address(BPT), alice);
+        vm.stopPrank();
+    }
+
+    function testSweepNormal() public {
+        uint256 arbitraryAmount = 1000e18;
+        // Make alice owner of the contract
+        inflationController.transferOwnership(alice);
+
+        // Generate some ERC20 tokens to sweep
+        setStorage(
+            address(inflationController),
+            BPT.balanceOf.selector,
+            address(BPT),
+            arbitraryAmount
+        );
+        // Sweep and check that alice has the ERC20 tokens
+        vm.prank(alice);
+        inflationController.sweep(address(BPT), alice);
+        assertEq(BPT.balanceOf(alice), arbitraryAmount);
+    }
+
+    function testSweepFails() public {
+        // Make alice owner of the contract
+        inflationController.transferOwnership(alice);
+        // Tries to sweep ERC20 tokens that are timelocked and fails
+        vm.startPrank(alice);
+        vm.expectRevert("InflationController: protected token");
+        inflationController.sweep(address(GOLD), alice);
+        vm.stopPrank();
+    }
+
+    function testsweepGasToken() public {
+        uint256 aliceBalanceBefore = address(alice).balance;
+        // Deal some eth to the contract
+        uint256 arbitraryAmount = 1000e18;
+        vm.deal(address(inflationController), 1000e18);
+        // Make alice owner of the contract
+        inflationController.transferOwnership(alice);
+        vm.startPrank(alice);
+        inflationController.sweepGasToken(payable(alice));
+        vm.stopPrank();
+
+        // Make sure alice has the eth
+        assertEq(address(alice).balance - aliceBalanceBefore, arbitraryAmount);
     }
 }

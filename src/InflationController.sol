@@ -17,6 +17,8 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol"
  */
 contract InflationController is Ownable {
     uint256 public constant SWEEP_TIMELOCK_DURATION = 14 days;
+    address public constant PROTECTED_TOKEN =
+        address(0xbeFD5C25A59ef2C1316c5A4944931171F30Cd3E4);
 
     uint256 private _released;
     mapping(address => uint256) private _erc20Released;
@@ -33,6 +35,12 @@ contract InflationController is Ownable {
     event EtherReleased(uint256 amount);
     event ERC20Released(address indexed token, uint256 amount);
     event TimelockSet(uint256 timelockEnd);
+    event ERC20Swept(
+        address indexed token,
+        address indexed receiver,
+        uint256 amount
+    );
+    event GasTokenWithdrawn(uint256 amount, address indexed recipient);
 
     /**
      * @dev Set start timestamp and vesting duration of the inflation controller.
@@ -172,26 +180,46 @@ contract InflationController is Ownable {
     }
 
     /// @notice If Timelock is over, sweep all ERC20 tokens to the owner, otherwise create a new timelock
-    /// @param tokens Array of ERC20 token addresses
-    function sweepTimelock(
-        address[] memory tokens,
-        address receiver
-    ) external onlyOwner {
+    /// @param token Protocol token to sweep
+    function sweepTimelock(address token, address receiver) external onlyOwner {
+        require(
+            token == PROTECTED_TOKEN,
+            "InflationController: not protected token"
+        );
         if (timelockEnd == 0) {
             timelockEnd = block.timestamp + SWEEP_TIMELOCK_DURATION;
             emit TimelockSet(timelockEnd);
         } else if (block.timestamp >= timelockEnd) {
-            for (uint256 i = 0; i < tokens.length; i++) {
-                SafeERC20.safeTransfer(
-                    IERC20(tokens[i]),
-                    receiver,
-                    IERC20(tokens[i]).balanceOf(address(this))
-                );
-            }
+            uint256 amount = IERC20(token).balanceOf(address(this));
+            SafeERC20.safeTransfer(IERC20(token), receiver, amount);
             timelockEnd = 0;
             emit TimelockSet(timelockEnd);
+            emit ERC20Swept(token, receiver, amount);
         } else {
             revert("InflationController: timelock not over");
         }
+    }
+
+    /// @notice sweep unwanted tokens from the contract, no timelock for non-protected tokens
+    /// @param token token to sweep
+    /// @param receiver address to send the tokens to
+    function sweep(address token, address receiver) external onlyOwner {
+        require(
+            token != PROTECTED_TOKEN,
+            "InflationController: protected token"
+        );
+        require(receiver != address(0), "InflationController: zero address");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        SafeERC20.safeTransfer(IERC20(token), receiver, balance);
+        emit ERC20Swept(token, receiver, balance);
+    }
+
+    /// @notice withdraw gas token from the contract
+    /// @param receiver address to send the gas token to
+    function sweepGasToken(address payable receiver) external onlyOwner {
+        require(receiver != address(0), "InflationController: zero address");
+        uint256 amount = address(this).balance;
+        receiver.transfer(amount);
+        emit GasTokenWithdrawn(amount, receiver);
     }
 }
