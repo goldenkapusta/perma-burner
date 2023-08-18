@@ -6,7 +6,7 @@ import "../lib//openzeppelin-contracts/contracts/access/Ownable.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title VestingWallet
+ * @title InflationController
  * @dev This contract handles the vesting of Eth and ERC20 tokens for a given beneficiary. Custody of multiple tokens
  * can be given to this contract, which will release the token to the beneficiary following a given vesting schedule.
  * The vesting schedule is customizable through the {vestedAmount} function.
@@ -15,7 +15,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol"
  * Consequently, if the vesting has already started, any amount of tokens sent to this contract will (at least partly)
  * be immediately releasable.
  */
-contract VestingWallet is Ownable {
+contract InflationController is Ownable {
     event EtherReleased(uint256 amount);
     event ERC20Released(address indexed token, uint256 amount);
 
@@ -26,15 +26,15 @@ contract VestingWallet is Ownable {
 
     address private _beneficiary;
 
-    event BeneficiaryChanged(address indexed previousBeneficiary, address indexed newBeneficiary);
+    event BeneficiaryChanged(
+        address indexed previousBeneficiary,
+        address indexed newBeneficiary
+    );
 
     /**
-     * @dev Set start timestamp and vesting duration of the vesting wallet.
+     * @dev Set start timestamp and vesting duration of the inflation controller.
      */
-    constructor(
-        uint64 startTimestamp,
-        uint64 durationSeconds
-    ) payable {
+    constructor(uint64 startTimestamp, uint64 durationSeconds) payable {
         _start = startTimestamp;
         _duration = durationSeconds;
     }
@@ -142,11 +142,13 @@ contract VestingWallet is Ownable {
     /// @notice Set the beneficiary address
     /// @param _newBeneficiary Address of the beneficiary
     function setBeneficiary(address _newBeneficiary) external onlyOwner {
-        require(_beneficiary != address(0), "InflationController: zero address");
+        require(
+            _newBeneficiary != address(0),
+            "InflationController: zero address"
+        );
         address oldBeneficiary = _beneficiary;
         _beneficiary = _newBeneficiary;
         emit BeneficiaryChanged(oldBeneficiary, _newBeneficiary);
-
     }
 
     /**
